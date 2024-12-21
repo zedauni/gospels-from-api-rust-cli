@@ -1,6 +1,6 @@
 use chrono::{Datelike, Duration, NaiveDate};
 use serde_json::Value;
-use std::{error::Error, io::Write, process};
+use std::{error::Error, fs::File, io::Write, process};
 use structopt::StructOpt;
 
 #[allow(dead_code)]
@@ -33,9 +33,27 @@ struct Opt {
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    Opt::clap().print_help()?;
-    println!();
-    process::exit(1);
+    match (opt.day, opt.month, opt.range) {
+        (Some(day_str), None, None) => {
+            let day = NaiveDate::parse_from_str(&day_str, "%Y-%m-%d")
+                .map_err(|_| format!("Erreur lors de l'analyse de la date : {}", day_str))?;
+            let file_name = day.format("%Y-%m-%d.json").to_string();
+            if !std::path::Path::new(&file_name).exists() {
+                let results = serde_json::json!({ format_date_for_url(&day): process_day(&day)? });
+                let mut file = File::create(file_name.clone())?;
+                file.write_all(results.to_string().as_bytes())?;
+                println!("{} ✅", file_name);
+            } else {
+                println!("{} 🟠", file_name);
+            }
+        }
+        _ => {
+            Opt::clap().print_help()?;
+            println!();
+            process::exit(1);
+        }
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
