@@ -3,7 +3,6 @@ use serde_json::Value;
 use std::{error::Error, fs::File, io::Write, process};
 use structopt::StructOpt;
 
-#[allow(dead_code)]
 #[derive(Debug, StructOpt)]
 #[structopt(name = "gospels", about = "Gospels via API")]
 struct Opt {
@@ -29,7 +28,6 @@ struct Opt {
     range: Option<Vec<String>>,
 }
 
-#[allow(unused_variables)]
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
@@ -47,6 +45,39 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{} 🟠", file_name);
             }
         }
+        (None, Some(month_str), None) => {
+            let parts: Vec<&str> = month_str.split('-').collect();
+            if parts.len() != 2 {
+                return Err(format!(
+                    "Format incorrect pour le mois: {}, attendu YYYY-MM",
+                    month_str
+                )
+                .into());
+            }
+
+            let year: i32 = parts[0]
+                .parse()
+                .map_err(|_| format!("Erreur lors de l'analyse de l'année: {}", parts[0]))?;
+            let month: u32 = parts[1]
+                .parse()
+                .map_err(|_| format!("Erreur lors de l'analyse du mois: {}", parts[1]))?;
+
+            let month_date = NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(|| {
+                format!(
+                    "Erreur lors de la création de la date avec {}-{}-1",
+                    year, month
+                )
+            })?;
+            let file_name = month_date.format("%Y-%m.json").to_string();
+            if !std::path::Path::new(&file_name).exists() {
+                let results = process_month(&month_date)?;
+                let mut file = File::create(file_name.clone())?;
+                file.write_all(results.to_string().as_bytes())?;
+                println!("{} ✅", file_name);
+            } else {
+                println!("{} 🟠", file_name);
+            }
+        }
         _ => {
             Opt::clap().print_help()?;
             println!();
@@ -56,7 +87,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[allow(dead_code)]
 fn process_month(start_date: &NaiveDate) -> Result<serde_json::Value, Box<dyn Error>> {
     let (current_month_start, current_month_end) = month_range(start_date);
     let total_days = (current_month_end - current_month_start).num_days() + 1;
@@ -82,12 +112,10 @@ fn process_month(start_date: &NaiveDate) -> Result<serde_json::Value, Box<dyn Er
     Ok(serde_json::Value::Object(all_results))
 }
 
-#[allow(dead_code)]
 fn format_date_for_url(date: &NaiveDate) -> String {
     date.format("%Y-%m-%d").to_string()
 }
 
-#[allow(dead_code)]
 fn month_range(date: &NaiveDate) -> (NaiveDate, NaiveDate) {
     let first_day = date.with_day(1).unwrap();
     let last_day = if first_day.month() == 12 {
@@ -110,7 +138,6 @@ fn month_range(date: &NaiveDate) -> (NaiveDate, NaiveDate) {
     (first_day, last_day)
 }
 
-#[allow(dead_code)]
 fn process_day(date: &NaiveDate) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
     let url_date = format_date_for_url(date);
     let url = format!("https://api.aelf.org/v1/messes/{}/afrique", url_date);
