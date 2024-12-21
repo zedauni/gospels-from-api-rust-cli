@@ -78,6 +78,84 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{} 🟠", file_name);
             }
         }
+        (None, None, Some(range)) => {
+            if range.len() != 2 {
+                return Err("La plage de mois doit contenir exactement deux mois.".into());
+            }
+
+            let start_parts: Vec<&str> = range[0].split('-').collect();
+            if start_parts.len() != 2 {
+                return Err(format!(
+                    "Format incorrect pour le mois de début: {}, attendu YYYY-MM",
+                    range[0]
+                )
+                .into());
+            }
+
+            let start_year: i32 = start_parts[0].parse().map_err(|_| {
+                format!(
+                    "Erreur lors de l'analyse de l'année de début: {}",
+                    start_parts[0]
+                )
+            })?;
+            let start_month: u32 = start_parts[1].parse().map_err(|_| {
+                format!(
+                    "Erreur lors de l'analyse du mois de début: {}",
+                    start_parts[1]
+                )
+            })?;
+
+            let start_date =
+                NaiveDate::from_ymd_opt(start_year, start_month, 1).ok_or_else(|| {
+                    format!(
+                        "Erreur lors de la création de la date de début avec {}-{}-1",
+                        start_year, start_month
+                    )
+                })?;
+
+            let end_parts: Vec<&str> = range[1].split('-').collect();
+            if end_parts.len() != 2 {
+                return Err(format!(
+                    "Format incorrect pour le mois de fin: {}, attendu YYYY-MM",
+                    range[1]
+                )
+                .into());
+            }
+
+            let end_year: i32 = end_parts[0].parse().map_err(|_| {
+                format!(
+                    "Erreur lors de l'analyse de l'année de fin: {}",
+                    end_parts[0]
+                )
+            })?;
+            let end_month: u32 = end_parts[1].parse().map_err(|_| {
+                format!("Erreur lors de l'analyse du mois de fin: {}", end_parts[1])
+            })?;
+
+            let end_date = NaiveDate::from_ymd_opt(end_year, end_month, 1).ok_or_else(|| {
+                format!(
+                    "Erreur lors de la création de la date de fin avec {}-{}-1",
+                    end_year, end_month
+                )
+            })?;
+
+            let mut current_month = start_date;
+
+            while current_month <= end_date {
+                let file_name = current_month.format("%Y-%m.json").to_string();
+                if !std::path::Path::new(&file_name).exists() {
+                    let results = process_month(&current_month)?;
+                    let mut file = File::create(file_name.clone())?;
+                    file.write_all(results.to_string().as_bytes())?;
+                    println!("{} ✅", file_name);
+                } else {
+                    println!("{} 🟠", file_name);
+                }
+
+                // Next month
+                current_month = month_range(&current_month).1 + Duration::days(1);
+            }
+        }
         _ => {
             Opt::clap().print_help()?;
             println!();
