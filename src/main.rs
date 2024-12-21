@@ -1,4 +1,6 @@
 use std::{error::Error, process};
+use chrono::NaiveDate;
+use serde_json::Value;
 use structopt::StructOpt;
 
 #[allow(dead_code)]
@@ -34,4 +36,46 @@ fn main() -> Result<(), Box<dyn Error>> {
     Opt::clap().print_help()?;
     println!();
     process::exit(1);
+}
+
+#[allow(dead_code)]
+fn format_date_for_url(date: &NaiveDate) -> String {
+    date.format("%Y-%m-%d").to_string()
+}
+
+#[allow(dead_code)]
+fn process_day(date: &NaiveDate) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
+    let url_date = format_date_for_url(date);
+    let url = format!("https://api.aelf.org/v1/messes/{}/afrique", url_date);
+    let response = reqwest::blocking::get(&url)
+        .map_err(|e| format!("Erreur de requête à l'API: {}", e))?;
+    let json: Value = response.json()
+    .map_err(|_| "Erreur de réponse de l'API: données non disponibles".to_string())?;
+
+    let lectures: Vec<serde_json::Value> = json
+        .get("messes")
+        .and_then(|messes| messes.as_array())
+        .map(|messes| {
+            messes
+                .iter()
+                .flat_map(|messe| {
+                    messe.get("lectures")
+                        .and_then(|lectures| lectures.as_array())
+                        .unwrap_or(&Vec::new())
+                        .iter()
+                        .filter(|lecture| lecture.get("type").and_then(|t| t.as_str()) == Some("evangile"))
+                        .map(|lecture|{
+                            serde_json::json!({
+                                "ref": lecture.get("ref").and_then(|v|v.as_str()).unwrap_or(""),
+                                "titre": lecture.get("titre").and_then(|v|v.as_str()).unwrap_or(""),
+                                "contenu": lecture.get("contenu").and_then(|v|v.as_str()).unwrap_or("")
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(lectures)
 }
