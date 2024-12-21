@@ -1,6 +1,6 @@
-use std::{error::Error, process};
-use chrono::NaiveDate;
+use chrono::{Datelike, Duration, NaiveDate};
 use serde_json::Value;
+use std::{error::Error, process};
 use structopt::StructOpt;
 
 #[allow(dead_code)]
@@ -44,13 +44,37 @@ fn format_date_for_url(date: &NaiveDate) -> String {
 }
 
 #[allow(dead_code)]
+fn month_range(date: &NaiveDate) -> (NaiveDate, NaiveDate) {
+    let first_day = date.with_day(1).unwrap();
+    let last_day = if first_day.month() == 12 {
+        first_day
+            .with_year(first_day.year() + 1)
+            .unwrap()
+            .with_month(1)
+            .unwrap()
+            .with_day(1)
+            .unwrap()
+            - Duration::days(1)
+    } else {
+        first_day
+            .with_month(first_day.month() + 1)
+            .unwrap()
+            .with_day(1)
+            .unwrap()
+            - Duration::days(1)
+    };
+    (first_day, last_day)
+}
+
+#[allow(dead_code)]
 fn process_day(date: &NaiveDate) -> Result<Vec<serde_json::Value>, Box<dyn Error>> {
     let url_date = format_date_for_url(date);
     let url = format!("https://api.aelf.org/v1/messes/{}/afrique", url_date);
-    let response = reqwest::blocking::get(&url)
-        .map_err(|e| format!("Erreur de requête à l'API: {}", e))?;
-    let json: Value = response.json()
-    .map_err(|_| "Erreur de réponse de l'API: données non disponibles".to_string())?;
+    let response =
+        reqwest::blocking::get(&url).map_err(|e| format!("Erreur de requête à l'API: {}", e))?;
+    let json: Value = response
+        .json()
+        .map_err(|_| "Erreur de réponse de l'API: données non disponibles".to_string())?;
 
     let lectures: Vec<serde_json::Value> = json
         .get("messes")
