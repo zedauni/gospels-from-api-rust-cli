@@ -1,6 +1,6 @@
 use chrono::{Datelike, Duration, NaiveDate};
 use serde_json::Value;
-use std::{error::Error, process};
+use std::{error::Error, io::Write, process};
 use structopt::StructOpt;
 
 #[allow(dead_code)]
@@ -36,6 +36,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     Opt::clap().print_help()?;
     println!();
     process::exit(1);
+}
+
+#[allow(dead_code)]
+fn process_month(start_date: &NaiveDate) -> Result<serde_json::Value, Box<dyn Error>> {
+    let (current_month_start, current_month_end) = month_range(start_date);
+    let total_days = (current_month_end - current_month_start).num_days() + 1;
+    let mut all_results = serde_json::Map::new();
+
+    for i in 0..total_days {
+        let current_date = current_month_start + Duration::days(i);
+        let results = process_day(&current_date)?;
+        all_results.insert(
+            format_date_for_url(&current_date),
+            serde_json::Value::Array(results),
+        );
+
+        let progress = ((i + 1) as f64 / total_days as f64) * 100.0;
+        print!(
+            "\r{}... {:.2}%",
+            current_month_start.format("%Y-%m"),
+            progress
+        );
+        std::io::stdout().flush()?;
+    }
+    println!();
+    Ok(serde_json::Value::Object(all_results))
 }
 
 #[allow(dead_code)]
